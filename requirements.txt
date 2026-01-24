@@ -28,3 +28,7 @@ tokenizers==0.22.2
 tqdm==4.67.1
 typer-slim==0.21.1
 typing_extensions==4.15.0
+fastapi
+pydantic
+sqlalchemy
+uvicorn

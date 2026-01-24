@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.video import router as video_router
+from app.api.segment import router as segment_router
+from app.api.answer import router as answer_router
 from app.core.logger import logger
 from app.db.base import Base
 from app.db.session import engine
@@ -22,6 +24,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(video_router)
+    app.include_router(segment_router)
+    app.include_router(answer_router)
 
     return app
 
