@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# SQLite
+*.db
+*.sqlite3
+
+# Environment variables
+.env
+.env.*
+
+# Byte-compiled / cache
+*.pyc
+*.pyo
+*.pyd
+
+# Coverage
+htmlcov/
+.coverage
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Docker
+*.dockerfile
+docker-compose.override.yml
+
+*/__pycache__/
+*/.pytest_cache/
+.pytest_cache/
