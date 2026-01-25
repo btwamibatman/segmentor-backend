@@ -118,3 +118,4 @@ def generate_quiz_for_segment(segment):
     response = tokenizer.decode(output[0], skip_special_tokens=True)
 
     return parse_json(response)
+Асинхр. задания.  
