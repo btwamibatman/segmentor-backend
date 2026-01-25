@@ -52,3 +52,4 @@ docker-compose.override.yml
 
 
 data/
+test.wav
