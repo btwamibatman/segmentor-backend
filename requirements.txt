@@ -21,6 +21,9 @@ onnxruntime==1.23.2
 packaging==26.0
 protobuf==6.33.4
 PyYAML==6.0.3
+pydantic==2.5.0
+scikit-learn==1.4.2
+sentence-transformers==2.2.2
 setuptools==80.10.1
 shellingham==1.5.4
 sympy==1.14.0
@@ -28,7 +31,9 @@ tokenizers==0.22.2
 tqdm==4.67.1
 typer-slim==0.21.1
 typing_extensions==4.15.0
-fastapi
-pydantic
-sqlalchemy
-uvicorn
+fastapi==0.104.0
+uvicorn==0.26.0
+sqlalchemy==2.0.23
+aiofiles==23.2.1
+python-multipart==0.0.6
+torch==2.3.0
