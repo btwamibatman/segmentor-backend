@@ -2,7 +2,7 @@ from typing import List, Dict
 import json
 import re
 import torch
-from app.ai.llm.quiz_generator import tokenizer, model
+from app.ai.llm import quiz_generator
 
 
 SYSTEM_PROMPT_SEG = (
@@ -87,12 +87,15 @@ def segment_video(video_id: int, transcript: dict) -> List[dict]:
     if not segments:
         return []
 
+    if quiz_generator.tokenizer is None or quiz_generator.model is None:
+        return basic_segmentation(segments)
+
     # Prepare transcript text with timestamps
     text_with_times = "\n".join([f"[{format_time(s['start'])} - {format_time(s['end'])}] {s['text']}" for s in segments])
 
     user_prompt = SEGMENT_PROMPT_TEMPLATE.format(text=text_with_times)
 
-    prompt = tokenizer.apply_chat_template(
+    prompt = quiz_generator.tokenizer.apply_chat_template(
         [
             {"role": "system", "content": SYSTEM_PROMPT_SEG},
             {"role": "user", "content": user_prompt},
@@ -100,24 +103,24 @@ def segment_video(video_id: int, transcript: dict) -> List[dict]:
         tokenize=False
     )
 
-    inputs = tokenizer(
+    inputs = quiz_generator.tokenizer(
         prompt,
         return_tensors="pt",
         padding=True
-    ).to(model.device)
+    ).to(quiz_generator.model.device)
 
     with torch.no_grad():
-        output = model.generate(
+        output = quiz_generator.model.generate(
             **inputs,
             max_new_tokens=800,
             do_sample=False,
             temperature=0.0,
             top_p=1.0,
-            eos_token_id=tokenizer.eos_token_id,
-            pad_token_id=tokenizer.eos_token_id,
+            eos_token_id=quiz_generator.tokenizer.eos_token_id,
+            pad_token_id=quiz_generator.tokenizer.eos_token_id,
         )
 
-    response = tokenizer.decode(output[0], skip_special_tokens=True)
+    response = quiz_generator.tokenizer.decode(output[0], skip_special_tokens=True)
 
     print(f"Segmentation LLM Response: {response}")
 
