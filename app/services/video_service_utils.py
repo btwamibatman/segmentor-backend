@@ -1,6 +1,7 @@
 import subprocess
 import os
 from pathlib import Path
+import shutil
 import yt_dlp
 
 def extract_audio(video_id: int, video_path: str) -> str | None:
@@ -45,6 +46,21 @@ def download_audio_from_url(url: str, output_stem: str) -> str:
     """
     Path(output_stem).parent.mkdir(parents=True, exist_ok=True)
 
+    ffmpeg_location = None
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        # Common local install path used in this repo setup
+        fallback_dir = Path(r"C:\ffmpeg\ffmpeg-8.0.1-essentials_build\bin")
+        fallback_bin = fallback_dir / "ffmpeg.exe"
+        if fallback_bin.exists():
+            ffmpeg_bin = str(fallback_bin)
+
+    if ffmpeg_bin:
+        ffmpeg_dir = str(Path(ffmpeg_bin).parent)
+        # Ensure child process can see ffmpeg/ffprobe
+        os.environ["PATH"] = f"{ffmpeg_dir}{os.pathsep}" + os.environ.get("PATH", "")
+        ffmpeg_location = ffmpeg_bin
+
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": f"{output_stem}.%(ext)s",
@@ -53,6 +69,7 @@ def download_audio_from_url(url: str, output_stem: str) -> str:
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }],
+        "ffmpeg_location": ffmpeg_location,
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
