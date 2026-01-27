@@ -17,6 +17,9 @@ env/
 # macOS
 .DS_Store
 
+# Windows
+Thumbs.db
+
 # Logs
 *.log
 
@@ -45,6 +48,18 @@ dist/
 # Docker
 *.dockerfile
 docker-compose.override.yml
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Temporary files
+*.swp
+*.swo
+*.tmp
+
+# Data directories (uncomment if needed)
+# data/videos/
+# data/audio/
 
 */__pycache__/
 */.pytest_cache/
