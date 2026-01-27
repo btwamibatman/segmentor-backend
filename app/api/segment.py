@@ -2,14 +2,17 @@ import json
 import os
 from typing import List, Any
 
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.answer import SegmentAnswer
 from app.models.video import Video
+from app.models.source import VideoSource
 from app.schemas.answer import SegmentAnswerRequest, SegmentAnswerResponse
-from app.schemas.segment import SegmentItem, SegmentQuizResponse
+from app.schemas.segment import SegmentItem, SegmentQuizResponse, SegmentRequest
+from app.schemas.video import VideoCreateResponse
+from app.services.video_service import process_video_url
 
 router = APIRouter(tags=["segments"])
 
@@ -62,6 +65,13 @@ def _get_video(db: Session, video_id: int) -> Video:
     return video
 
 
+def _get_video_by_url(db: Session, video_url: str) -> Video | None:
+    source = db.query(VideoSource).filter(VideoSource.source_url == video_url).first()
+    if not source:
+        return None
+    return db.query(Video).filter(Video.id == source.video_id).first()
+
+
 def _locked_map(db: Session, video_id: int, user_id: str, total: int) -> dict[int, bool]:
     if total <= 0:
         return {}
@@ -96,16 +106,78 @@ def _get_segment_quiz(video: Video, segment_id: int) -> List[Any]:
     return quiz_block
 
 
-@router.get("/segments", response_model=List[SegmentItem])
-def get_segments(
-    video_id: int,
-    user_id: str,
+@router.post("/segments", response_model=VideoCreateResponse)
+def create_segments_job(
+    payload: SegmentRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _: None = Depends(_require_access_token),
 ):
-    video = _get_video(db, video_id)
+    if not payload.video_url:
+        raise HTTPException(status_code=400, detail="video_url is required")
+
+    existing_video = _get_video_by_url(db, payload.video_url)
+    if existing_video:
+        return VideoCreateResponse(video_id=existing_video.id, status=existing_video.status)
+
+    video = Video(file_path="", status="downloading")
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+
+    db.add(VideoSource(video_id=video.id, source_url=payload.video_url))
+    db.commit()
+
+    if background_tasks is not None:
+        background_tasks.add_task(process_video_url, video.id, payload.video_url)
+    else:
+        process_video_url(video.id, payload.video_url)
+
+    return VideoCreateResponse(video_id=video.id, status=video.status)
+
+
+@router.get("/segments", response_model=List[SegmentItem])
+def get_segments(
+    background_tasks: BackgroundTasks,
+    video_id: int | None = None,
+    video_url: str | None = None,
+    url: str | None = None,
+    user_id: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(_require_access_token),
+):
+    user = user_id or "anonymous"
+    target_url = video_url or url
+
+    if target_url:
+        video = _get_video_by_url(db, target_url)
+        if not video:
+            video = Video(file_path="", status="downloading")
+            db.add(video)
+            db.commit()
+            db.refresh(video)
+
+            db.add(VideoSource(video_id=video.id, source_url=target_url))
+            db.commit()
+
+            if background_tasks is not None:
+                background_tasks.add_task(process_video_url, video.id, target_url)
+            else:
+                process_video_url(video.id, target_url)
+
+            return []
+    elif video_id is not None:
+        video = _get_video(db, video_id)
+    else:
+        raise HTTPException(status_code=400, detail="video_id or video_url is required")
+
+    if target_url and video.status != "done":
+        return []
+    if not target_url and video.status != "done":
+        raise HTTPException(status_code=409, detail=f"Video status is '{video.status}'")
+
     segments = _load_json(video.segments) or []
-    locked = _locked_map(db, video_id, user_id, len(segments))
+    locked = _locked_map(db, video.id, user, len(segments))
     return _build_segment_items(video, locked)
 
 

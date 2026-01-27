@@ -6,7 +6,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 token = os.getenv("HUGGINGFACE_TOKEN")
-MODEL = "meta-llama/Llama-2-7b-chat-hf"
+MODEL = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
 _has_bitsandbytes = importlib.util.find_spec("bitsandbytes") is not None
 

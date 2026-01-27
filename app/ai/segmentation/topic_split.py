@@ -19,11 +19,21 @@ def split_into_chunks(segments: List[Dict], chunk_size: int = 10) -> List[Dict]:
     return chunks
 
 
+_MODEL = None
+
+
+def _get_model() -> SentenceTransformer:
+    global _MODEL
+    if _MODEL is None:
+        _MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+    return _MODEL
+
+
 def segment_topics(chunks: List[Dict], n_topics: int = 5) -> List[Dict]:
     """
     Cluster chunks into topics using embeddings.
     """
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    model = _get_model()
 
     texts = [c["text"] for c in chunks]
     embeddings = model.encode(texts, show_progress_bar=False)
@@ -40,12 +50,14 @@ def segment_topics(chunks: List[Dict], n_topics: int = 5) -> List[Dict]:
 
     result = []
     for label, data in topics.items():
+        full_text = " ".join(data["texts"]).strip()
         result.append({
             "start_time": seconds_to_hhmmss(data["start"]),
             "end_time": seconds_to_hhmmss(data["end"]),
             "topic_title": "Topic " + str(label + 1),
-            "short_summary": " ".join(data["texts"])[:250] + "...",
-            "keywords": extract_keywords(" ".join(data["texts"]))
+            "short_summary": (full_text[:250] + "...") if len(full_text) > 250 else full_text,
+            "keywords": extract_keywords(full_text),
+            "text": full_text,
         })
 
     result.sort(key=lambda x: x["start_time"])

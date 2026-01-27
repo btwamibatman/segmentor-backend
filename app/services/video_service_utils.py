@@ -1,5 +1,7 @@
 import subprocess
 import os
+import uuid
+from pathlib import Path
 
 def extract_audio(video_id: int, video_path: str) -> str | None:
     probe = subprocess.run(
@@ -35,3 +37,24 @@ def extract_audio(video_id: int, video_path: str) -> str | None:
     )
 
     return audio_path
+
+
+def download_video_from_url(video_url: str) -> str:
+    os.makedirs("data/videos", exist_ok=True)
+    filename = f"{uuid.uuid4()}.mp4"
+    output_path = Path("data/videos") / filename
+
+    subprocess.run(
+        [
+            "yt-dlp",
+            "-f",
+            "mp4",
+            "--no-playlist",
+            "-o",
+            str(output_path),
+            video_url,
+        ],
+        check=True,
+    )
+
+    return str(output_path)

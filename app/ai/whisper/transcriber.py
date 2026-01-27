@@ -30,7 +30,8 @@ def transcribe(audio_path: str) -> dict:
             task="transcribe",
             verbose=False
         )
-    except Exception:
+    except Exception as e:
+        print(f"ASR error: {e}")
         return {
             "text": "",
             "segments": [],
