@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.video import router as video_router
@@ -6,9 +7,11 @@ from app.api.segment import router as segment_router
 from app.api.answer import router as answer_router
 from app.core.logger import logger
 from app.db.base import Base
+from app.models import Video, SegmentAnswer
 from app.db.session import engine
 
 def create_app() -> FastAPI:
+    load_dotenv()
     app = FastAPI(
         title="SegMentor",
         version="0.1.0",

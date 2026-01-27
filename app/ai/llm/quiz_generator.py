@@ -1,18 +1,23 @@
 import json
 import re
 import os
+import importlib.util
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 token = os.getenv("HUGGINGFACE_TOKEN")
 MODEL = "meta-llama/Llama-2-7b-chat-hf"
 
-bnb_config = BitsAndBytesConfig(
+_has_bitsandbytes = importlib.util.find_spec("bitsandbytes") is not None
+
+bnb_config = None
+if _has_bitsandbytes:
+  bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
     bnb_4bit_use_double_quant=True,
     bnb_4bit_quant_type="nf4",
     bnb_4bit_compute_dtype=torch.float16,
-)
+  )
 
 tokenizer = AutoTokenizer.from_pretrained(
     MODEL,
@@ -21,11 +26,19 @@ tokenizer = AutoTokenizer.from_pretrained(
 
 tokenizer.pad_token = tokenizer.eos_token
 
+model_kwargs = {
+  "device_map": "auto",
+  "offload_folder": "offload",
+}
+
+if bnb_config is not None:
+  model_kwargs["quantization_config"] = bnb_config
+elif torch.cuda.is_available():
+  model_kwargs["torch_dtype"] = torch.float16
+
 model = AutoModelForCausalLM.from_pretrained(
-    MODEL,
-    quantization_config=bnb_config,
-    device_map="auto",
-    offload_folder="offload"
+  MODEL,
+  **model_kwargs
 )
 
 SYSTEM_PROMPT = """
@@ -118,4 +131,3 @@ def generate_quiz_for_segment(segment):
     response = tokenizer.decode(output[0], skip_special_tokens=True)
 
     return parse_json(response)
-Асинхр. задания.  
