@@ -2,6 +2,10 @@
 
 AI Video Topic Segmentation & In-Video Quiz Backend
 
+## Frontend Repo
+
+https://github.com/Y-not-devs/segmentor-frontend
+
 ## Features
 
 - **Video Upload**: Accept MP4/MKV/MOV/AVI files
