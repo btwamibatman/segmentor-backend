@@ -5,6 +5,9 @@ class VideoCreateResponse(BaseModel):
     video_id: int
     status: str
 
+class VideoUrlRequest(BaseModel):
+    url: str
+
 class SegmentResponse(BaseModel):
     id: int
     start_time: str

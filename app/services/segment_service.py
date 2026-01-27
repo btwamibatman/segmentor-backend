@@ -1,27 +1,3 @@
-import yt_dlp
-import os
-
-def download_audio_from_url(url: str, output_path: str) -> str:
-    """
-    Скачивает аудиодорожку с видео по ссылке (например, YouTube) и сохраняет в output_path.
-    Возвращает путь к сохранённому аудиофайлу.
-    """
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': output_path,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',  # Можно заменить на 'wav' при необходимости
-            'preferredquality': '192',
-        }],
-        'quiet': True,
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-    # yt-dlp может добавить расширение автоматически
-    if not output_path.endswith('.mp3'):
-        output_path = output_path + '.mp3'
-    return output_path
 from typing import List, Dict
 import json
 import re

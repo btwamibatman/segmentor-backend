@@ -3,17 +3,29 @@ from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Depends, HTTPE
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.video import Video
-from app.schemas.video import VideoCreateResponse, SegmentResponse, QuizResponse, AnswerRequest, AnswerResponse
-from app.services.video_service import process_video
+from app.schemas.video import VideoCreateResponse, VideoUrlRequest, SegmentResponse, QuizResponse, AnswerRequest, AnswerResponse
+from app.services.video_service import process_video, process_video_from_url
 from pathlib import Path
 import uuid
 import json
 from typing import List
+from urllib.parse import urlparse
 
 router = APIRouter(prefix="/video", tags=["video"])
 
 UPLOAD_DIR = Path("data/videos")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+def _is_supported_video_url(url: str) -> bool:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return False
+    host = parsed.netloc.lower()
+    if host == "youtube.com" or host.endswith(".youtube.com"):
+        return True
+    if host == "youtu.be":
+        return True
+    return False
 
 @router.post("/upload", response_model=VideoCreateResponse)
 async def upload_video(
@@ -37,6 +49,27 @@ async def upload_video(
     db.refresh(video)
 
     background_tasks.add_task(process_video, video.id)
+
+    return VideoCreateResponse(video_id=video.id, status=video.status)
+
+@router.post("/from-url", response_model=VideoCreateResponse)
+def upload_video_from_url(
+    payload: VideoUrlRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    url = payload.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+    if not _is_supported_video_url(url):
+        raise HTTPException(status_code=400, detail="Only YouTube URLs are supported")
+
+    video = Video(file_path="pending", status="queued")
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+
+    background_tasks.add_task(process_video_from_url, video.id, url)
 
     return VideoCreateResponse(video_id=video.id, status=video.status)
 
