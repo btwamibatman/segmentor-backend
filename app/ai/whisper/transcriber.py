@@ -1,52 +1,54 @@
 import os
 import torch
-import whisper
+from faster_whisper import WhisperModel
 
-
-_MODEL = None
-
+# Use a single underscore for the global placeholder
+_model_instance = None
 
 def _load_model():
-    global _MODEL
-    if _MODEL is None:
+    global _model_instance
+    if _model_instance is None:
+        # Auto-detect hardware
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        _MODEL = whisper.load_model("small", device=device)
-    return _MODEL
-
+        # use int8 for CPU, float16 for GPU
+        compute_type = "float16" if device == "cuda" else "int8"
+        
+        # Initialize faster-whisper correctly
+        _model_instance = WhisperModel("small", device=device, compute_type=compute_type)
+    return _model_instance
 
 def transcribe(audio_path: str) -> dict:
     if not os.path.exists(audio_path):
-        return {
-            "text": "",
-            "segments": [],
-            "language": None
-        }
+        return {"text": "", "segments": [], "language": None}
 
     model = _load_model()
 
     try:
-        result = model.transcribe(
-            audio_path,
-            task="transcribe",
-            verbose=False
+        # faster-whisper returns a generator (segments) and an info object
+        segments_generator, info = model.transcribe(
+            audio_path, 
+            beam_size=5,
+            task="transcribe"
         )
-    except Exception:
+
+        segments = []
+        text_parts = []
+
+        # You MUST iterate to actually perform the transcription
+        for s in segments_generator:
+            text_parts.append(s.text.strip())
+            segments.append({
+                "start": float(s.start),
+                "end": float(s.end),
+                "text": s.text.strip()
+            })
+
         return {
-            "text": "",
-            "segments": [],
-            "language": None
+            "text": " ".join(text_parts),
+            "segments": segments,
+            "language": info.language
         }
 
-    segments = []
-    for seg in result.get("segments", []):
-        segments.append({
-            "start": float(seg["start"]),
-            "end": float(seg["end"]),
-            "text": seg["text"].strip()
-        })
-
-    return {
-        "text": result.get("text", "").strip(),
-        "segments": segments,
-        "language": result.get("language")
-    }
+    except Exception as e:
+        print(f"Transcription Error: {e}")
+        return {"text": "", "segments": [], "language": None}
