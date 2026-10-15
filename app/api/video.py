@@ -1,24 +1,41 @@
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Depends, HTTPException
+import json
+import uuid
+from pathlib import Path
+from typing import Annotated, List
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import Path as ApiPath
 from sqlalchemy.orm import Session
+
 from app.db.session import get_db
 from app.models.video import Video
-from app.schemas.video import VideoCreateResponse, SegmentResponse, QuizResponse, AnswerRequest, AnswerResponse
-from app.services.video_service import process_video
-from pathlib import Path
-import uuid
-import json
-from typing import List
+from app.schemas.video import (
+    AnswerRequest,
+    AnswerResponse,
+    QuizResponse,
+    SegmentResponse,
+    VideoCreateResponse,
+)
 
 router = APIRouter(prefix="/video", tags=["video"])
 
 UPLOAD_DIR = Path("data/videos")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+
+def process_video_in_background(video_id: int) -> None:
+    # Import lazily so API startup and non-processing endpoints do not load the
+    # multi-gigabyte ML stack.
+    from app.services.video_service import process_video
+
+    process_video(video_id)
+
+
 @router.post("/upload", response_model=VideoCreateResponse)
 async def upload_video(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     ext = Path(file.filename).suffix
     if ext.lower() not in [".mp4", ".mkv", ".mov", ".avi"]:
@@ -35,9 +52,10 @@ async def upload_video(
     db.commit()
     db.refresh(video)
 
-    background_tasks.add_task(process_video, video.id)
+    background_tasks.add_task(process_video_in_background, video.id)
 
     return VideoCreateResponse(video_id=video.id, status=video.status)
+
 
 @router.get("/{video_id}/segments", response_model=List[SegmentResponse])
 def get_segments(video_id: int, db: Session = Depends(get_db)):
@@ -48,8 +66,13 @@ def get_segments(video_id: int, db: Session = Depends(get_db)):
     segments = json.loads(video.segments)
     return [SegmentResponse(id=i, **seg) for i, seg in enumerate(segments)]
 
+
 @router.get("/{video_id}/segment/{segment_index}/quiz", response_model=QuizResponse)
-def get_quiz(video_id: int, segment_index: int, db: Session = Depends(get_db)):
+def get_quiz(
+    video_id: int,
+    segment_index: Annotated[int, ApiPath(ge=0)],
+    db: Session = Depends(get_db),
+):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video or video.status != "done":
         raise HTTPException(status_code=404, detail="Video not found or not processed")
@@ -65,11 +88,19 @@ def get_quiz(video_id: int, segment_index: int, db: Session = Depends(get_db)):
         topic_title=segment["topic_title"],
         short_summary=segment["short_summary"],
         keywords=segment["keywords"],
-        quiz=quiz["quiz"]
+        quiz=quiz["quiz"],
     )
 
-@router.post("/{video_id}/segment/{segment_index}/answer", response_model=AnswerResponse)
-def answer_quiz(video_id: int, segment_index: int, answer: AnswerRequest, db: Session = Depends(get_db)):
+
+@router.post(
+    "/{video_id}/segment/{segment_index}/answer", response_model=AnswerResponse
+)
+def answer_quiz(
+    video_id: int,
+    segment_index: Annotated[int, ApiPath(ge=0)],
+    answer: AnswerRequest,
+    db: Session = Depends(get_db),
+):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video or video.status != "done":
         raise HTTPException(status_code=404, detail="Video not found or not processed")
@@ -89,7 +120,7 @@ def answer_quiz(video_id: int, segment_index: int, answer: AnswerRequest, db: Se
     elif question["type"] == "true_false":
         correct = answer.answer == question["correct_answer"]
     elif question["type"] == "short_answer":
-        # For short answer, since correct_answer is null, assume any answer is correct for now
+        # Short answers currently have no reference answer, so accept any response.
         correct = True
 
     feedback = "Correct!" if correct else "Incorrect, please review the segment."
